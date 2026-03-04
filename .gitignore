@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
+
+# ML Models
+*.pkl
+
+# Dataset
+*.csv
+
+# Node
+node_modules/
+
+# Android / Capacitor
+android/.gradle/
+android/build/
+
+# Mac
+.DS_Store
