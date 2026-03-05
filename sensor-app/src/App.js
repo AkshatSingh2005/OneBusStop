@@ -8,6 +8,8 @@ import {
   IonTabs
 } from '@ionic/react';
 
+import './tailwind.css'
+
 import { IonReactRouter } from '@ionic/react-router';
 
 import { Route, Redirect } from 'react-router-dom';
