@@ -74,7 +74,26 @@ def predict(data: dict):
         risk_level = "HIGH"
 
     return {
-        "behaviour_class": behaviour,
-        "risk_score": round(risk_score, 2),
-        "risk_level": risk_level
-    }
+
+    "behaviour_class": behaviour,
+
+    "risk_score": round(risk_score, 2),
+
+    "risk_level": risk_level,
+
+    "speed_kmph":
+        float(df["speed_kmph"].iloc[0]),
+
+    "jerk":
+        float(df["jerk"].iloc[0]),
+
+    "turn_intensity":
+        float(
+            df["turn_intensity"].iloc[0]
+        ),
+
+    "gps_acceleration":
+        float(
+            df["gps_acceleration"].iloc[0]
+        )
+}

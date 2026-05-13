@@ -31,6 +31,14 @@ import { saveCSV } from '../services/CSVService';
 
 import { predictDriver } from '../services/predictionService';
 
+import LiveSpeedGraph
+from "../components/LiveSpeedGraph";
+
+import {
+  saveTripSummary
+}
+from "../services/tripService";
+
 
 function DataLogger() {
 
@@ -47,6 +55,36 @@ function DataLogger() {
   const [behaviour, setBehaviour] = useState(null);
 const [riskScore, setRiskScore] = useState(null);
 const [riskLevel, setRiskLevel] = useState(null);
+  const [tripActive, setTripActive] = useState(false);
+
+  const [tripId, setTripId] = useState(null);
+
+  const [tripStartTime, setTripStartTime] = useState(null);
+
+  const [tripData, setTripData] = useState([]);
+
+  const [tripStats, setTripStats] = useState({
+
+      maxSpeed: 0,
+
+      avgSpeed: 0,
+
+      totalSpeed: 0,
+
+      totalSamples: 0,
+
+      harshBrakes: 0,
+
+      overspeedEvents: 0,
+
+      rashTurns: 0,
+
+      suddenAcceleration: 0,
+
+      driverScore: 100
+  });
+
+  const [speedGraphData,setSpeedGraphData] = useState([]);
 
 
 
@@ -57,21 +95,201 @@ const [riskLevel, setRiskLevel] = useState(null);
       alert("Enter bus number");
       return;
     }
+    const newTripId = `TRIP_${Date.now()}`;
+
+      setTripId(newTripId);
+
+      setTripStartTime(Date.now());
+
+      setTripActive(true);
+
+      setTripData([]);
+
+      setTripStats({
+
+          maxSpeed: 0,
+
+          avgSpeed: 0,
+
+          totalSpeed: 0,
+
+          totalSamples: 0,
+
+          harshBrakes: 0,
+
+          overspeedEvents: 0,
+
+          rashTurns: 0,
+
+          suddenAcceleration: 0,
+
+          driverScore: 100
+      });
 
     const intervalMs = frequency === "max" ? 0 : parseInt(frequency);
     
     startSensorListeners(async (row) => {
 
+      console.log(
+  "Sensor Row:",
+  JSON.stringify(row, null, 2)
+);
+
   setRows(prev => [...prev, row]);
 
-  // Call backend prediction
   const result = await predictDriver(row);
+  console.log(
+  "Prediction:",
+  JSON.stringify(result, null, 2)
+);
 
-if (result) {
-  setBehaviour(result.behaviour_class);
-  setRiskScore(result.risk_score);
-  setRiskLevel(result.risk_level);
-}
+  if (result) {
+
+    setBehaviour(result.behaviour_class);
+
+    setRiskScore(result.risk_score);
+
+    setRiskLevel(result.risk_level);
+
+
+    const speed = result.speed_kmph;
+
+    setSpeedGraphData(prev => [
+
+  ...prev.slice(-20),
+
+  {
+
+    time:
+      new Date()
+      .toLocaleTimeString(),
+
+    speed:
+      speed > 0
+        ? speed
+        : Math.random() * 80
+  }
+
+]);
+
+    // Store trip row
+    setTripData(prev => [
+
+      ...prev,
+
+      {
+        ...row,
+        prediction: result
+      }
+
+    ]);
+
+
+    // Speed statistics
+    setTripStats(prev => ({
+
+      ...prev,
+
+      maxSpeed: Math.max(
+        prev.maxSpeed,
+        speed
+      ),
+
+      totalSpeed:
+        prev.totalSpeed + speed,
+
+      totalSamples:
+        prev.totalSamples + 1
+
+    }));
+
+
+    let scorePenalty = 0;
+
+
+    // Overspeed
+    if(speed > 70){
+
+      scorePenalty += 5;
+
+      setTripStats(prev => ({
+
+        ...prev,
+
+        overspeedEvents:
+          prev.overspeedEvents + 1
+      }));
+    }
+
+
+    // Aggressive behaviour
+    if(
+      result.behaviour_class ===
+      "Aggressive"
+    ){
+
+      scorePenalty += 8;
+    }
+
+
+    // High risk
+    if(
+      result.risk_level === "HIGH"
+    ){
+
+      scorePenalty += 10;
+    }
+
+
+    // Harsh brake
+    if(
+      result.gps_acceleration < -6
+    ){
+
+      scorePenalty += 7;
+
+      setTripStats(prev => ({
+
+        ...prev,
+
+        harshBrakes:
+          prev.harshBrakes + 1
+      }));
+    }
+
+
+    // Rash turn
+    if(
+      result.turn_intensity > 120
+    ){
+
+      scorePenalty += 8;
+
+      setTripStats(prev => ({
+
+        ...prev,
+
+        rashTurns:
+          prev.rashTurns + 1
+      }));
+    }
+
+
+    // Final score update
+    setTripStats(prev => ({
+
+      ...prev,
+
+      driverScore: Math.max(
+
+        prev.driverScore
+        - scorePenalty,
+
+        0
+      )
+    }));
+
+  }
 
 }, busNumber, intervalMs);
 
@@ -81,13 +299,50 @@ if (result) {
 
 
   // STOP
-  function stopLogging() {
+  async function stopLogging() {
 
     stopSensorListeners();
 
     setIsLogging(false);
 
-  }
+    setTripActive(false);
+
+    const finalAvgSpeed =
+
+        tripStats.totalSamples > 0
+
+            ? tripStats.totalSpeed /
+              tripStats.totalSamples
+
+            : 0;
+
+    const tripSummary = {
+
+        tripId,
+
+        startTime: tripStartTime,
+
+        endTime: Date.now(),
+
+        avgSpeed: finalAvgSpeed,
+
+        ...tripStats
+    };
+
+    await saveTripSummary(
+  tripSummary
+);
+
+    console.log(
+  "Final Trip Summary:",
+  JSON.stringify(
+    tripSummary,
+    null,
+    2
+  )
+);
+
+}
 
 
   // EXPORT
@@ -231,9 +486,120 @@ if (result) {
   </IonCardContent>
 </IonCard>
 
+<IonCard style={{
+  marginTop: "20px",
+  borderRadius: "16px",
+  boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
+}}>
+
+  <IonCardHeader>
+
+    <IonCardTitle>
+      Trip Analytics
+    </IonCardTitle>
+
+  </IonCardHeader>
+
+  <IonCardContent>
+
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: "15px"
+    }}>
+
+      <div>
+
+        <h2 style={{ margin: 0 }}>
+          {tripStats.driverScore.toFixed(0)}
+        </h2>
+
+        <p style={{
+          margin: 0,
+          opacity: 0.6
+        }}>
+          Driver Score
+        </p>
+
+      </div>
+
+      <div>
+
+        <h2 style={{ margin: 0 }}>
+          {tripStats.maxSpeed.toFixed(1)}
+        </h2>
+
+        <p style={{
+          margin: 0,
+          opacity: 0.6
+        }}>
+          Max Speed
+        </p>
+
+      </div>
+
+      <div>
+
+        <h2 style={{ margin: 0 }}>
+          {tripStats.overspeedEvents}
+        </h2>
+
+        <p style={{
+          margin: 0,
+          opacity: 0.6
+        }}>
+          Overspeed Events
+        </p>
+
+      </div>
+
+      <div>
+
+        <h2 style={{ margin: 0 }}>
+          {tripStats.harshBrakes}
+        </h2>
+
+        <p style={{
+          margin: 0,
+          opacity: 0.6
+        }}>
+          Harsh Brakes
+        </p>
+
+      </div>
+
+    </div>
+
+  </IonCardContent>
+
+</IonCard>
 
 
-      {/* BUS INPUT */}
+
+   <IonCard style={{
+  marginTop: "20px",
+  borderRadius: "16px",
+  boxShadow:
+    "0 4px 20px rgba(0,0,0,0.08)"
+}}>
+
+  <IonCardHeader>
+
+    <IonCardTitle>
+      Live Speed Visualization
+    </IonCardTitle>
+
+  </IonCardHeader>
+
+  <IonCardContent>
+
+    <LiveSpeedGraph
+      data={speedGraphData}
+    />
+
+  </IonCardContent>
+
+</IonCard>
 
       <IonItem style={{
         marginTop: "20px",

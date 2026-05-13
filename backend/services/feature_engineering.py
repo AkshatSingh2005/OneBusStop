@@ -5,7 +5,11 @@ def compute_features(df):
 
     df = df.copy()
 
-    df["Location_speed"] = df["Location_speed"].fillna(0)
+    if "Location_speed" not in df.columns:
+        df["Location_speed"] = 0
+
+    df["Location_speed"] = \
+        df["Location_speed"].fillna(0)
 
     df["time_sec"] = df["global_time"] / 1e9
 

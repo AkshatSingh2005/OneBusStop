@@ -19,3 +19,7 @@ android/build/
 
 # Mac
 .DS_Store
+
+src/firebaseConfig.js
+
+sensor-app/src/firebaseConfig.js
