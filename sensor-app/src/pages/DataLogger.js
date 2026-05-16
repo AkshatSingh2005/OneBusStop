@@ -27,6 +27,16 @@ import {
   IonSelectOption
 } from '@ionic/react';
 
+import {
+
+  collection,
+  addDoc
+
+} from "firebase/firestore";
+
+import { db }
+from "../firebaseConfig";
+
 import { saveCSV } from '../services/CSVService';
 
 import { predictDriver } from '../services/predictionService';
@@ -35,7 +45,8 @@ import LiveSpeedGraph
 from "../components/LiveSpeedGraph";
 
 import {
-  saveTripSummary
+  saveTripSummary,
+  saveTripData
 }
 from "../services/tripService";
 
@@ -85,6 +96,12 @@ const [riskLevel, setRiskLevel] = useState(null);
   });
 
   const [speedGraphData,setSpeedGraphData] = useState([]);
+
+  useEffect(() => {
+
+  firebaseStartupTest();
+
+}, []);
 
 
 
@@ -329,9 +346,20 @@ const [riskLevel, setRiskLevel] = useState(null);
         ...tripStats
     };
 
-    await saveTripSummary(
+   console.log(
+  "Saving trip summary..."
+);
+
+await saveTripSummary(
   tripSummary
 );
+
+console.log(
+  "Trip summary saved!"
+);
+
+    // Save detailed trip data to Firebase
+    //await saveTripData(tripId, tripData);
 
     console.log(
   "Final Trip Summary:",
@@ -361,9 +389,61 @@ const [riskLevel, setRiskLevel] = useState(null);
 
   }
 
+  const firebaseStartupTest =
+async () => {
+
+  try {
+
+    console.log(
+      "Firebase startup test..."
+    );
+
+    const docRef = await addDoc(
+
+      collection(
+        db,
+        "startup_test"
+      ),
+
+      {
+
+        app: "OneBusStop",
+
+        status: "App Opened",
+
+        timestamp: Date.now()
+      }
+
+    );
+
+    console.log(
+
+      "Firebase startup success:",
+
+      docRef.id
+
+    );
+
+  } catch(error){
+
+    console.error(
+
+      "Firebase startup failed:",
+
+      JSON.stringify(
+        error,
+        null,
+        2
+      )
+
+    );
+  }
+};
 
 
   return (
+
+
 
   <IonPage>
 
